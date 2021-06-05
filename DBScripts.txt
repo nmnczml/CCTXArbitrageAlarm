@@ -1,0 +1,95 @@
+CREATE TABLE `ArbitrageRaw` (
+  `Store` varchar(50) CHARACTER SET utf8 COLLATE utf8_turkish_ci DEFAULT NULL,
+  `Pair` varchar(20) CHARACTER SET utf8 COLLATE utf8_turkish_ci DEFAULT NULL,
+  `Symbol` varchar(20) CHARACTER SET utf8 COLLATE utf8_turkish_ci DEFAULT NULL,
+  `DateTm` varchar(35) CHARACTER SET utf8 COLLATE utf8_turkish_ci DEFAULT NULL,
+  `High` decimal(10,6) DEFAULT NULL,
+  `Low` decimal(10,6) DEFAULT NULL,
+  `Bid` decimal(10,6) DEFAULT NULL,
+  `Ask` decimal(10,6) DEFAULT NULL,
+  `Volume` decimal(10,6) DEFAULT NULL,
+  `UpdateTm` datetime DEFAULT NULL,
+  `SymbolLeft` varchar(10) CHARACTER SET utf8 COLLATE utf8_turkish_ci DEFAULT NULL,
+  `SymbolRight` varchar(10) CHARACTER SET utf8 COLLATE utf8_turkish_ci DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_turkish_ci;
+
+-- ------------------------------------------------------------------------
+
+CREATE DEFINER=`admin`@`%` PROCEDURE `Upd_ArbitrageRaw_Sp`(
+p_Store varchar(50), 
+p_Pair varchar(20), 
+p_Symbol varchar(20), 
+p_DateTm varchar(35),
+p_High decimal(10,6), 
+p_Low decimal(10,6), 
+p_Bid decimal(10,6), 
+p_Ask decimal(10,6), 
+p_Volume decimal(10,6), 
+p_SymbolLeft varchar(10), 
+p_SymbolRight varchar(10)
+)
+BEGIN
+
+UPDATE `ArbitrageRaw`
+SET
+
+`DateTm` = p_DateTm,
+`High` = p_High,
+`Low` = p_Low,
+`Bid` = p_Bid,
+`Ask` = p_Ask,
+`Volume` = p_Volume,
+SymbolLeft = p_SymbolLeft,
+SymbolRight = p_SymbolRight,
+UpdateTm = NOW()
+WHERE `Store` = p_Store and `Pair` = p_Pair;
+
+if (ROW_COUNT()=0) then
+
+INSERT INTO `ArbitrageRaw`
+(`Store`,
+`Pair`,
+`Symbol`,
+`DateTm`,
+`High`,
+`Low`,
+`Bid`,
+`Ask`,
+`Volume`,UpdateTm,SymbolLeft,SymbolRight )
+VALUES
+( p_Store, p_Pair, p_Symbol, p_DateTm, p_High, p_Low, p_Bid, p_Ask, p_Volume,NOW(),p_SymbolLeft,p_SymbolRight );
+	  
+
+end if;
+
+
+END
+-- ------------------------------------------------------------------------
+
+CREATE TABLE `ArbitrageDiffs` (
+  `Symbol` varchar(50) CHARACTER SET utf8 COLLATE utf8_turkish_ci DEFAULT NULL,
+  `Diff` decimal(10,6) DEFAULT NULL,
+  `SymbolLowMarket` varchar(45) CHARACTER SET utf8 COLLATE utf8_turkish_ci DEFAULT NULL,
+  `SymbolHighMarket` varchar(45) CHARACTER SET utf8 COLLATE utf8_turkish_ci DEFAULT NULL,
+  `UpdateTm` datetime DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_turkish_ci;
+
+
+-- ------------------------------------------------------------------------
+
+CREATE DEFINER=`admin`@`%` PROCEDURE `Bat_CalculateArbitrage_Sp`()
+BEGIN
+truncate table ArbitrageDiffs;
+insert into ArbitrageDiffs
+select x.Symbol,
+Max(x.Ask)- Min(x.Ask) as 'Lows', 
+(select Store from Arbitrage where Symbol = x.Symbol and Ask = min(x.Ask) limit 1 ) as 'MinStore',
+(select Store from Arbitrage where Symbol = x.Symbol and Ask = max(x.Ask) limit 1 ) as 'HighStore', NOW()
+from Arbitrage x 
+group by x.Symbol
+having Max(x.Ask)- Min(x.Ask)>0.3;
+
+END
+
+
+
